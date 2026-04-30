@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Plan | naqd</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --success: #10b981;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+
+        body { background-color: var(--bg); color: var(--text-main); min-height: 100vh; padding: 40px 20px; }
+
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 10px; color: var(--text-main); }
+        .header p { color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Notification Box */
+        .notification {
+            display: none;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            text-align: center;
+            font-weight: 600;
+            animation: fadeIn 0.3s ease;
+        }
+        .notification.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; display: block; }
+        .notification.danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+        .notification.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Plans Grid */
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .plan-card {
+            background: var(--card-bg);
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            padding: 32px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plan-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+
+        /* Visual Feedback for Selection */
+        .plan-card.selected { 
+            border: 2px solid var(--primary); 
+            background: #eff6ff;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .plan-card.selected::after {
+            content: '✓ Selected';
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .plan-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; }
+        .plan-price { font-size: 2rem; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
+        .plan-price span { font-size: 1rem; color: var(--text-muted); font-weight: 500; }
+
+        .plan-desc { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+
+        .plan-details { border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        .detail-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
+        .detail-item span:first-child { color: var(--text-muted); }
+        .detail-item span:last-child { font-weight: 600; }
+
+        /* Button Container */
+        .actions { text-align: center; }
+        .btn-continue {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 50px;
+            font-size: 1.125rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-continue:hover:not(:disabled) { background: var(--primary-dark); transform: scale(1.02); }
+        .btn-continue:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 640px) {
+            .btn-continue { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Select Your Plan</h1>
+            <p>Choose a plan to create your room and start interacting</p>
+        </div>
+
+        <div id="notification" class="notification"></div>
+
+        <div id="plansGrid" class="plans-grid">
+            <p style="text-align: center; grid-column: 1/-1;">Loading plans...</p>
+        </div>
+
+        <div class="actions">
+            <button id="continueBtn" class="btn-continue" disabled>
+                <span id="spinner" class="spinner"></span>
+                <span id="btnText">Select a Plan</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        const token = localStorage.getItem('token');
+
+        // Global Variable for Selection
+        let selectedPlanId = null;
+
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+
+        // Fetch Plans
+        async function fetchPlans() {
+            try {
+                const res = await fetch(`${API_BASE}/plans`);
+                const plans = await res.json();
+                renderPlans(plans);
+            } catch (err) {
+                console.error("[FRONTEND] Error fetching plans:", err);
+                showNotification('danger', 'Failed to load plans. Please refresh the page.');
+            }
+        }
+
+        function renderPlans(plans) {
+            const grid = document.getElementById('plansGrid');
+            
+            // 1. Render HTML using data-id
+            grid.innerHTML = plans.map(plan => `
+                <div class="plan-card" data-id="${plan.id}">
+                    <div class="plan-name">${plan.name}</div>
+                    <div class="plan-price">${plan.price} <span>coins</span></div>
+                    <div class="plan-desc">${plan.description || 'No description available.'}</div>
+                    <div class="plan-details">
+                        <div class="detail-item">
+                            <span>Max Users</span>
+                            <span>${plan.max_users}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span>Mics</span>
+                            <span>${plan.number_mics}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span>Duration</span>
+                            <span>${plan.expire_date} Months</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 2. Attach click events AFTER rendering
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    // Remove selection from all
+                    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+                    
+                    // Add selection to clicked
+                    card.classList.add('selected');
+
+                    // Save selected plan ID using dataset
+                    selectedPlanId = card.dataset.id;
+                    console.log("[FIX] Selected Plan ID:", selectedPlanId);
+
+                    // Enable Continue button
+                    const btn = document.getElementById('continueBtn');
+                    btn.disabled = false;
+                    document.getElementById('btnText').textContent = 'Continue with Selection';
+                });
+            });
+        }
+
+        // Continue Button Logic
+        document.getElementById('continueBtn').addEventListener('click', async function() {
+            console.log("[FRONTEND] Continue clicked");
+
+            if (!selectedPlanId) {
+                console.log("[FRONTEND] No plan selected");
+                showNotification('warning', 'Please select a plan first');
+                return;
+            }
+
+            console.log("[FRONTEND] Sending plan_id:", selectedPlanId);
+
+            const btn = this;
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            const notification = document.getElementById('notification');
+
+            // UI Loading State
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            btnText.textContent = 'Processing...';
+            notification.className = 'notification';
+
+            try {
+                const res = await fetch(`${API_BASE}/subscriptions/create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ plan_id: selectedPlanId })
+                });
+
+                const data = await res.json();
+                console.log("[FRONTEND] Response:", data);
+
+                if (res.ok) {
+                    showNotification('success', 'Subscription successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = 'create-room.html';
+                    }, 1500);
+                } else {
+                    handleError(data.message);
+                    resetButton();
+                }
+
+            } catch (err) {
+                console.error("[FRONTEND] Critical Fetch Error:", err);
+                showNotification('danger', 'A server error occurred. Please try again.');
+                resetButton();
+            }
+        });
+
+        function handleError(message) {
+            if (message === "Not enough coins") {
+                showNotification('danger', 'You do not have enough coins to purchase this plan');
+            } else if (message === "You already have an active subscription") {
+                showNotification('warning', 'You already have an active subscription. Please wait until it expires');
+            } else {
+                showNotification('danger', message || 'Failed to create subscription');
+            }
+        }
+
+        function showNotification(type, message) {
+            const n = document.getElementById('notification');
+            n.className = `notification ${type}`;
+            n.textContent = message;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetButton() {
+            const btn = document.getElementById('continueBtn');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            btn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = 'Continue with Selection';
+        }
+
+        // Init
+        fetchPlans();
+    </script>
+</body>
+</html>

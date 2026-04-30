@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | naqd</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --error: #ef4444;
+            --success: #10b981;
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .auth-card {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px;
+            border-radius: var(--radius);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.6s ease;
+        }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .auth-header { text-align: center; margin-bottom: 25px; }
+        .auth-header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+
+        /* Avatar Preview Styles */
+        .avatar-upload {
+            position: relative;
+            max-width: 120px;
+            margin: 0 auto 25px auto;
+        }
+        .avatar-preview {
+            width: 120px;
+            height: 120px;
+            position: relative;
+            border-radius: 50%;
+            border: 4px solid #334155;
+            overflow: hidden;
+            background: #334155;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .avatar-preview:hover { border-color: var(--primary); }
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .avatar-edit {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+        }
+        .avatar-edit input { display: none; }
+        .avatar-edit label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            margin-bottom: 0;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 3px solid var(--card-bg);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .avatar-edit label:hover { transform: scale(1.1); }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: var(--transition);
+        }
+        input:focus { border-color: var(--primary); }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn-submit:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .message {
+            font-size: 0.85rem;
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+        }
+        .message.error { display: block; background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .message.success { display: block; background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+
+        .auth-footer { text-align: center; margin-top: 30px; font-size: 0.9rem; color: var(--text-muted); }
+        .auth-footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Create Account</h1>
+            <p>Fill in the details to get started</p>
+        </div>
+
+        <form id="registerForm">
+            <!-- Avatar Upload Area -->
+            <div class="avatar-upload">
+                <div class="avatar-edit">
+                    <input type='file' id="imageUpload" accept="image/*" />
+                    <label for="imageUpload">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </label>
+                </div>
+                <div class="avatar-preview" onclick="document.getElementById('imageUpload').click()">
+                    <img id="imagePreview" src="https://via.placeholder.com/150?text=Avatar" alt="Avatar Preview">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="name" placeholder="Choose a name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Min 6 characters" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <span class="spinner" id="spinner"></span>
+                <span id="btnText">Join naqd</span>
+            </button>
+
+            <div id="msg" class="message"></div>
+        </form>
+
+        <div class="auth-footer">
+            Already have an account? <a href="login.html">Sign In</a>
+        </div>
+    </div>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const registerForm = document.getElementById('registerForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const spinner = document.getElementById('spinner');
+        const btnText = document.getElementById('btnText');
+        const msg = document.getElementById('msg');
+
+        // Handle Image Preview
+        imageUpload.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            msg.className = 'message';
+            msg.textContent = '';
+            submitBtn.disabled = true;
+            spinner.style.display = 'block';
+            btnText.textContent = 'Creating Account...';
+
+            const name = document.getElementById('name').value;
+            const password = document.getElementById('password').value;
+            const avatarFile = imageUpload.files[0];
+
+            // Use FormData for file upload compatibility with Multer backend
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('password', password);
+            if (avatarFile) formData.append('avatar', avatarFile);
+
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/register', {
+                    method: 'POST',
+                    body: formData // No headers needed for FormData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.message || 'Registration failed');
+
+                msg.className = 'message success';
+                msg.textContent = 'Account created! Redirecting to login...';
+
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+
+            } catch (err) {
+                msg.className = 'message error';
+                msg.textContent = err.message;
+                submitBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Join naqd';
+            }
+        });
+    </script>
+</body>
+</html>

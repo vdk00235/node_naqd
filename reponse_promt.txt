@@ -1,0 +1,23 @@
+الاجوب 
+1- ال webtrc
+2-نعم
+3-نعم
+4-(
+    1 	id Primary 	int(11) 			No 	None 		AUTO_INCREMENT
+	2 	name 	varchar(255) 	utf8_unicode_ci
+	3 	logo 	varchar(355) 	utf8_unicode_ci
+	4 	plan_id 	int(11)
+	5 	number_mic 	int(11)
+	6 	creared_by 	int(11)
+	7 	status 	enum('active', 'expired', 'canceled') 	utf8_unicode_ci
+	8 	isLive 	tinyint(1)
+	9 	last_live_time 	timestamp 
+	10 	max_users 	int(11) 
+	11 	created_at 	date 
+	12 	expires_at 	date
+	13 	subscriptions_id 	int(11) 
+)  عند التشغيل يضاف
+5-الافضل
+6-ال owner يمكن كتم اي صوت 
+7-اذا خرج ورجع يرجع ك listener
+8-لو ال max_users ملع ويريد مستخدم الى غرف يظهر الاحد الادنى اكتمل حوال لاحقا مع هاذا ال admin يمكنه ان يدخل بدون مشكلة 

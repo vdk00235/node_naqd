@@ -1,0 +1,94 @@
+اضف ايقونة في صفحة rooms ايقونة بدع الدردشة وانشأ صفحة تظهر فيه دوائر صغير ياخذ border raduis ويكون دائري ويكون في ال bacground image صور الضوائر ويكون في ال ايقونة mic وعند الضغط عليه يصبح ايقونة mute 
+ويكون ال main عنده bacground image 
+ال لbackround image الموجد في الدواءر هو صورة ال avatar من جدول users ويظهر تحته اسم المستخدم 
+والاثاني من rooms وتحديد ال column logo وفي ال header تظهر تظر صور avatar صاحب ال rooms
+
+وال عدد ال mic يعطي من plans المستخدم مشتركها لمعرفتها 
+حيكل البينات ال plans :
+ 	1 	id Primary 	int(11) 
+	2 	name 	text 	utf8_unicode_ci 
+	3 	description 	text 	utf8_unicode_ci
+	4 	price 	int(11) 
+	5 	max_users 	int(11)
+	6 	number_mics 	int(11) 
+	7 	expire_date 	int(11) 	
+
+وحيكل البينات الخاص في ال rooms:
+    1 	id Primary 	int(11) 			No 	None 		AUTO_INCREMENT 
+	2 	name 	varchar(255) 	utf8_unicode_ci 
+	3 	logo 	varchar(355) 	utf8_unicode_ci
+	4 	plan_id 	int(11)
+	5 	number_mic 	int(11) 
+	6 	creared_by 	int(11)
+	7 	status 	enum('active', 'expired', 'canceled') 	utf8_unicode_ci
+	8 	isLive 	tinyint(1)
+	9 	max_users 	int(11)
+	10 	created_at 	date
+	11 	expires_at 	date
+	12 	subscriptions_id 	int(11) 
+
+عدد ال mic هو من column number_mic
+يعني لو كان عدد ال mic 7 لايمكن ان يدخل ويكلم اكقر من عدد ال mic
+ويكون عدد الدوئر الظاهر  نفس عدد ال mic
+
+في الصفحة الرئشية في زر تشغيل ال rooms واكان المستخدم ليس لديه rooms لا يظر عند الضغط عليه يصبح ال isLive true 
+ال isLive من جدول
+
+    1 	id Primary 	int(11) 			No 	None 		AUTO_INCREMENT 
+	2 	name 	varchar(255) 	utf8_unicode_ci
+	3 	logo 	varchar(355) 	utf8_unicode_ci
+	4 	plan_id 	int(11)
+	5 	number_mic 	int(11)
+	6 	creared_by 	int(11)
+	7 	status 	enum('active', 'expired', 'canceled') 	utf8_unicode_ci
+	8 	isLive 	tinyint(1)
+    9 	last_live_time 	timestamp 			Yes 	NULL
+	10 	max_users 	int(11)
+	11 	created_at 	date
+	12 	expires_at 	date
+	13 	subscriptions_id 	int(11) 
+
+وعند التشغيل يدخل المستخدم لغرفته 
+وينضاف في جدول 
+
+ 	1 	id Primary 	int(11) 			No 	None 		AUTO_INCREMENT 
+	2 	user_id 	int(11) 			No 	None 			Change Change
+	3 	room_id 	int(11) 			No 	None 			Change Change
+	4 	role 	enum('listener', 'speaker', 'admin', 'owner') 	utf8_unicode_ci
+	5 	joined_at 	datetime
+	6 	is_online 	tinyint(1) 
+
+ينداف ك owner ما الصلاحيات كل واحد ال 
+-listener :
+    يصمع يكت رسال فقد
+-speaker :
+     يصمع يتحدث يكتب رسال
+-admin :
+     يصمع يكت رسال فقد بدون ما ينحسب انه موجود
+- owner :
+    يفتح يدخل يتكلم يكتب يوافق على طلب الانضمام يغلق ويستطيع طرد ال speaker و يجعلهم listener 
+    من خلال ضغط طويل على الضائر 
+    عند الضغط على ضائر فادية لايحدث شيء وعند الضغط المطول على الضائر الي فيها شخص يصبح listener
+
+ولو مستخدم ضغط على الضائر الخاص به يصبح mute و عند الضغط مرة اخر يستطيع ان يتكلم
+
+في التحت في زر طلب الانضمام عند الضغط عليه يظهر مباشرة لصاحب العرفة شيء فيه avatar الشخص الي طلب اسمه ومع زرين ينضم و زر لا عند الضغط على ينضم يصبح من 
+listener الى speaker و في خانة تظهر في ال room_messages وهو عل شكل التالي:
+ 	1 	id Primary 	bigint(20) 			No 	None 		AUTO_INCREMENT
+	2 	room_id Index 	int(11) 			No 	None 
+	3 	sender_id Index 	int(11) 			No 	None 
+	4 	content 	text 	utf8_unicode_ci 		No 	None 
+	5 	reply_to Index 	bigint(20) 			Yes 	NULL 	
+	6 	is_deleted 	tinyint(1) 			Yes 	0 	 	
+	7 	created_at 	timestamp 		
+
+فقد يجلب ال message لل room ولي يكون تاريخ ال created_at احدث من last_live_time
+ويظهر في خانة صغير وفيه ممكن عمل scroll و في تحت في input كتابت رسال عند الكتاب يخزن في room_messages يظر عنده ويظر عند جميع المستخدمين الي في نفس ال rooms لو شخص دخل ال room وفي رسائل قبله يظهر بشرط ال created_at احدث من last_live_time 
+
+المستخدم صاحب العرفة هو اول واحد في ال mic اي مثلا لو عدد ال mic 7 يكون هو الاول ويبقى 6
+
+في الاعلى في header جب صورة المستخدم صاحب الغرفة امامه اسمه و عدد المشاهدين وبدون حساب ال admin
+
+اسالني اسألة وقلي هل في شيء ناقص وثم اعطني نسخ الكامل لل وصف لاعمل promt كامل 
+نتبيه ارسال وطلب  الانضمام وال صوت يكون لحزيين والرساءل والطلب الانضمام socket.io 
+والصوت هو websocket

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Users | naqd</title>
+    <link rel="stylesheet" href="./styles/seach.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Find Friends</h1>
+            <p>Connect with other users on naqd</p>
+        </header>
+
+        <div id="alert" class="alert"></div>
+
+        <div class="search-box">
+            <input type="text" id="searchQuery" placeholder="Start typing to search..." autocomplete="off">
+        </div>
+
+        <div id="loader" class="loader">Searching users...</div>
+        <div id="userList" class="user-list"></div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = 'login.html';
+
+        const searchInput = document.getElementById('searchQuery');
+        const list = document.getElementById('userList');
+        const loader = document.getElementById('loader');
+        let debounceTimer;
+
+        // Initial search to show recent users
+        searchUsers();
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            loader.style.display = 'block';
+            list.style.opacity = '0.5';
+
+            debounceTimer = setTimeout(() => {
+                searchUsers();
+            }, 300); // 300ms debounce
+        });
+
+        async function searchUsers() {
+            const q = searchInput.value;
+            const alert = document.getElementById('alert');
+            
+            try {
+                const res = await fetch(`http://localhost:3000/api/users/search?q=${encodeURIComponent(q)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const users = await res.json();
+                
+                loader.style.display = 'none';
+                list.style.opacity = '1';
+                
+                if (users.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No users found matching your search.</p>';
+                    return;
+                }
+
+                list.innerHTML = users.map(user => `
+                    <div class="user-card">
+                        <img src="${user.avatar ? 'http://localhost:3000/uploads/' + user.avatar : 'https://via.placeholder.com/50'}" class="avatar">
+                        <div class="user-info">
+                            <div class="user-name">${user.name}</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="sendRequest(${user.id}, this)">Add Friend</button>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                loader.style.display = 'none';
+                list.style.opacity = '1';
+                showMsg('error', 'Search failed. Please try again.');
+            }
+        }
+
+        async function sendRequest(toUserId, btn) {
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            
+            try {
+                const res = await fetch('http://localhost:3000/api/friends/request', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({ toUserId })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showMsg('success', 'Friend request sent!');
+                    btn.textContent = 'Sent';
+                } else {
+                    showMsg('error', data.message || 'Request failed');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch (err) {
+                showMsg('error', 'Network error. Request failed.');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        function showMsg(type, text) {
+            const alert = document.getElementById('alert');
+            alert.textContent = text;
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => alert.style.display = 'none', 4000);
+        }
+    </script>
+</body>
+</html>

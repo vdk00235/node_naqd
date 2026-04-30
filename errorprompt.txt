@@ -1,0 +1,789 @@
+#room.html:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Room | naqd</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="./styles/room.css">
+</head>
+<body>
+
+    <header>
+        <div class="owner-info">
+            <img id="ownerAvatar" src="https://via.placeholder.com/45" class="owner-avatar">
+            <div>
+                <div style="font-weight: 800;" id="roomName">Loading Room...</div>
+                <div class="viewer-count">
+                    <span style="color: #10b981;">●</span> <span id="viewers">0</span> viewers
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-leave" onclick="location.href='rooms.html'">Leave Room</button>
+    </header>
+
+    <main>
+        <div class="mic-section">
+            <div id="micGrid" class="mic-grid">
+                <!-- Mics rendered dynamically -->
+            </div>
+            
+            <div class="controls">
+                <button id="joinMicBtn" class="btn btn-join-mic" onclick="requestMic()">Request Mic</button>
+                <button id="muteBtn" class="btn btn-mute" style="display: none;" onclick="toggleMute()">Mute</button>
+            </div>
+        </div>
+
+        <div class="chat-section">
+            <div class="chat-header">Live Chat</div>
+            <div id="messages" class="messages"></div>
+            <div class="input-area">
+                <textarea id="chatInput" rows="1" placeholder="Say something..."></textarea>
+                <button class="btn-send" onclick="sendMsg()">Send</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="ownerPanel">
+        <div style="font-weight: 800; font-size: 0.8rem; color: var(--muted); border-bottom: 1px solid #334155; padding-bottom: 8px;">MIC QUEUE</div>
+        <div id="queueList"></div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('id');
+        const token = localStorage.getItem('token');
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+
+        if (!token || !roomId) window.location.href = 'rooms.html';
+
+        const socket = io("http://localhost:3000", { auth: { token } });
+        let currentRole = 'listener';
+        let isMuted = false;
+        let localStream = null;
+        let peers = {}; // WebRTC connections
+
+        // 1. Initial Join
+        socket.emit("room:join", { roomId });
+
+        // 2. UI Updates
+        socket.on("room:update_state", (state) => {
+            const { members, owner } = state;
+            document.getElementById('roomName').textContent = "Audio Room";
+            document.getElementById('ownerAvatar').src = owner.avatar ? `http://localhost:3000/uploads/${owner.avatar}` : 'https://via.placeholder.com/45';
+            
+            // Viewers count
+            const viewers = members.filter(m => m.is_online).length;
+            document.getElementById('viewers').textContent = viewers;
+
+            // Render Mic Grid
+            renderMics(members);
+
+            // Set Role
+            const me = members.find(m => m.user_id == currentUser.id);
+            if (me) {
+                currentRole = me.role;
+                updateControls();
+                if (currentRole === 'owner') document.getElementById('ownerPanel').style.display = 'block';
+            }
+        });
+
+        function renderMics(members) {
+            const grid = document.getElementById('micGrid');
+            grid.innerHTML = '';
+            
+            // Fixed slots (example: 10 mics)
+            const maxMics = 10;
+            const speakers = members.filter(m => ['owner', 'speaker'].includes(m.role));
+            
+            for (let i = 0; i < maxMics; i++) {
+                const user = speakers[i];
+                const slot = document.createElement('div');
+                slot.className = 'mic-slot';
+                
+                if (user) {
+                    const avatar = user.avatar ? `http://localhost:3000/uploads/${user.avatar}` : 'https://via.placeholder.com/85';
+                    slot.innerHTML = `
+                        <div class="mic-circle active">
+                            <img src="${avatar}">
+                            ${user.role === 'owner' ? '<span class="mic-badge">OWNER</span>' : ''}
+                        </div>
+                        <div class="mic-name">${user.name}</div>
+                    `;
+                } else {
+                    slot.innerHTML = `<div class="mic-circle empty-mic"></div><div class="mic-name">Empty</div>`;
+                }
+                grid.appendChild(slot);
+            }
+        }
+
+        function updateControls() {
+            const joinBtn = document.getElementById('joinMicBtn');
+            const muteBtn = document.getElementById('muteBtn');
+
+            if (['owner', 'speaker'].includes(currentRole)) {
+                joinBtn.style.display = 'none';
+                muteBtn.style.display = 'block';
+                startStreaming();
+            } else {
+                joinBtn.style.display = 'block';
+                muteBtn.style.display = 'none';
+            }
+        }
+
+        // 3. Mic Requests
+        function requestMic() {
+            socket.emit("room:request_mic", { roomId });
+            document.getElementById('joinMicBtn').disabled = true;
+            document.getElementById('joinMicBtn').textContent = 'Pending...';
+        }
+
+        socket.on("room:queue_update", (queue) => {
+            const list = document.getElementById('queueList');
+            list.innerHTML = queue.map(item => `
+                <div class="queue-item">
+                    <img src="${item.avatar ? 'http://localhost:3000/uploads/' + item.avatar : 'https://via.placeholder.com/30'}" class="queue-avatar">
+                    <span style="font-size: 0.75rem; font-weight: 700;">${item.name}</span>
+                    <div class="queue-actions">
+                        <button class="q-btn q-accept" onclick="acceptMic(${item.user_id})">✓</button>
+                        <button class="q-btn" style="background:#475569; color:white;" onclick="rejectMic(${item.user_id})">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        });
+
+        function acceptMic(targetUserId) { socket.emit("room:accept_request", { roomId, targetUserId }); }
+        function rejectMic(targetUserId) { socket.emit("room:reject_request", { roomId, targetUserId }); }
+
+        // 4. Messaging
+        function sendMsg() {
+            const input = document.getElementById('chatInput');
+            if (!input.value.trim()) return;
+            socket.emit("room:send_message", { roomId, message: input.value });
+            input.value = '';
+        }
+
+        socket.on("room:new_message", (msg) => {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            if (msg.user_id === 0) {
+                div.className = 'msg-sys';
+                div.textContent = msg.message;
+            } else {
+                div.className = 'msg';
+                div.innerHTML = `<span class="msg-name">${msg.fromUserName}:</span>${msg.message}`;
+            }
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        });
+
+        // 5. Audio Streaming (WebRTC)
+        async function startStreaming() {
+            if (localStream) return;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // In a production app, here you would implement the WebRTC PeerConnection logic
+                // and broadcast your track to all other users in the room.
+                console.log("[WEBRTC] Audio stream started");
+            } catch (err) { console.error("Mic access denied", err); }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
+            document.getElementById('muteBtn').textContent = isMuted ? 'Unmute' : 'Mute';
+            document.getElementById('muteBtn').style.background = isMuted ? '#10b981' : 'var(--accent)';
+        }
+
+        socket.on("room:error", (msg) => {
+            alert(msg);
+            if (msg === "Room is full") window.location.href = 'rooms.html';
+        });
+
+        socket.on("room:close", () => {
+            alert("The room has been closed by the owner.");
+            window.location.href = 'rooms.html';
+        });
+
+        window.onbeforeunload = () => { socket.emit("room:leave", { roomId }); };
+    </script>
+</body>
+</html>
+
+#rooms.html:
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore Rooms | naqd</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+   <link rel="stylesheet" href="./styles/rooms.css">
+</head>
+
+<body>
+
+    <div id="statusToast" class="notification"></div>
+
+    <div class="container">
+        <header>
+            <h1>Discover Rooms</h1>
+
+            <div class="header-actions">
+                <a href="/search.html" class="icon-btn" title="Search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </a>
+                <a href="/chats.html" class="icon-btn" title="Chats">
+                    <i class="fa-solid fa-message"></i>
+                </a>
+                <a href="/notifications.html" class="icon-btn" title="Notifications">
+                    <i class="fa-solid fa-bell"></i>
+                </a>
+                <a href="create-room.html" class="btn-create">
+                    <i class="fa-solid fa-plus"></i>
+                    Create Room
+                </a>
+            </div>
+        </header>
+
+        <div id="roomsGrid" class="rooms-grid">
+            <p style="text-align: center; grid-column: 1/-1;">Searching for active rooms...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api/rooms';
+        const START_URL = 'http://localhost:3000/api/rooms/start';
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        if (!token) window.location.href = 'login.html';
+
+        async function fetchRooms() {
+            try {
+                const res = await fetch(API_URL, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 401) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!res.ok) throw new Error('Failed to fetch rooms');
+                const rooms = await res.json();
+                renderRooms(rooms);
+
+            } catch (err) {
+                console.error(err);
+                showToast("error", "Unable to connect to the server.");
+            }
+        }
+
+        function renderRooms(rooms) {
+            const grid = document.getElementById('roomsGrid');
+            grid.innerHTML = '';
+
+            if (rooms.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No rooms available yet.</p>';
+                return;
+            }
+
+            rooms.forEach(room => {
+                const isLive = room.isLive === 1;
+                const isOwner = user && (room.creared_by == user.id);
+                const isAdmin = user && (user.role === 'admin');
+                
+                const card = document.createElement('div');
+                card.className = `room-card ${isLive ? 'is-live' : 'is-offline'}`;
+                
+                card.onclick = (e) => {
+                    if (e.target.closest('.btn-start')) return;
+                    if (!isLive && !isOwner && !isAdmin) {
+                        showToast("error", "Room not started yet. Please wait for the owner.");
+                        return;
+                    }
+                    window.location.href = `room.html?id=${room.id}`;
+                };
+
+                const logoUrl = room.logo ? (room.logo.startsWith('http') ? room.logo : `http://localhost:3000${room.logo}`) : 'https://via.placeholder.com/300x180?text=Room+Logo';
+
+                let startBtnHtml = '';
+                if ((isOwner || isAdmin) && !isLive) {
+                    startBtnHtml = `
+                        <button class="btn-start" onclick="startRoom(${room.id})" title="Start Room">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="room-logo-wrapper">
+                        <img src="${logoUrl}" class="room-logo" alt="${room.name}">
+                        <span class="badge ${isLive ? 'live' : 'offline'}">
+                            ${isLive ? '● LIVE' : 'OFFLINE'}
+                        </span>
+                        ${startBtnHtml}
+                    </div>
+                    <div class="room-content">
+                        <div class="room-name">${room.name}</div>
+                        <div class="room-meta">
+                            <span><i class="fa-solid fa-users"></i> ${room.max_users} Max</span>
+                            <span class="room-status">
+                                <span class="status-dot ${room.status === 'active' ? 'dot-active' : 'dot-expired'}"></span>
+                                ${room.status}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        async function startRoom(roomId) {
+            try {
+                const res = await fetch(START_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ roomId })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    window.location.href = `room.html?id=${roomId}`;
+                } else {
+                    showToast("error", data.message || "Failed to start room");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("error", "Network error. Could not start room.");
+            }
+        }
+
+        function showToast(type, msg) {
+            const toast = document.getElementById('statusToast');
+            toast.textContent = msg;
+            toast.className = `notification ${type}`;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        fetchRooms();
+    </script>
+</body>
+
+</html>
+
+========server===========
+#index.js:
+const express = require("express");
+const mysql = require("mysql2/promise");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const http = require("http");
+
+const app = express();
+const server = http.createServer(app);
+const io = require("socket.io")(server, {
+  cors: { origin: "*" }
+});
+const PORT = 3000;
+
+// Security Configuration
+const JWT_SECRET = "NAQD_SUPER_SECURE_JWT_2024_KEY_PROD"; 
+const ADMIN_REGISTRATION_KEY = "NAQD_ADMIN_SECRET_2024";
+
+// ========================
+// MIDDLEWARE & STABILITY
+// ========================
+
+app.use(express.json());
+app.use(cors({
+  origin: "*", 
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// Global Request Logger
+app.use((req, res, next) => {
+  console.log(`[DEBUG] ${new Date().toISOString()} - ${req.method} ${req.url}`);
+  const body = req.body || {};
+  if (Object.keys(body).length > 0) {
+    console.log("BODY:", JSON.stringify(body, null, 2));
+  }
+  next();
+});
+
+// Ensure upload directories exist
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+app.use("/uploads", express.static(uploadDir));
+
+// ========================
+// DATABASE INTEGRATION
+// ========================
+
+const pool = mysql.createPool({
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "naqd",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
+});
+
+pool.on("error", (err) => {
+  console.error(">>> [DATABASE CRITICAL ERROR]:", err);
+});
+
+// ========================
+// AUTH MIDDLEWARE
+// ========================
+
+const authenticateToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized: No token provided" });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: "Unauthorized: Invalid or expired token" });
+      }
+      req.user = decoded;
+      next();
+    });
+  } catch (err) {
+    console.error("Auth Middleware Error:", err);
+    return res.status(500).json({ message: "Internal Auth Error" });
+  }
+};
+
+const authorizeRole = (role) => {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== role) {
+      return res.status(403).json({ message: `Forbidden: ${role} access required` });
+    }
+    next();
+  };
+};
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+});
+const upload = multer({ storage });
+
+// ========================
+// SOCKET.IO CORE (MERGED)
+// ========================
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error("Authentication error"));
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return next(new Error("Authentication error"));
+    socket.user = decoded;
+    next();
+  });
+});
+
+io.on("connection", (socket) => {
+  const userId = socket.user?.id;
+  if (!userId) return;
+
+  console.log(`[SOCKET] User connected: ${userId} (${socket.user.name})`);
+  socket.join(`user_${userId}`);
+
+  // -------------------------
+  // CHAT SYSTEM EVENTS
+  // -------------------------
+  socket.on("send_message", async (data) => {
+    try {
+      const { receiverId, message } = data;
+      if (!receiverId || !message) return;
+
+      // 1. Save to DB
+      const [msgResult] = await pool.execute(
+        "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
+        [userId, receiverId, message]
+      );
+
+      // 2. Update chat meta
+      const u1 = Math.min(userId, receiverId);
+      const u2 = Math.max(userId, receiverId);
+      await pool.execute(
+        "UPDATE chats SET last_message_at = NOW() WHERE user1_id = ? AND user2_id = ?",
+        [u1, u2]
+      );
+
+      const msgData = {
+        id: msgResult.insertId,
+        sender_id: userId,
+        receiver_id: receiverId,
+        message: message,
+        createdAt: new Date()
+      };
+
+      // 3. Emit to both (MANDATORY)
+      io.to(`user_${receiverId}`).emit("receive_message", msgData);
+      socket.emit("receive_message", msgData);
+      
+    } catch (err) { console.error("[SOCKET CHAT ERROR]:", err); }
+  });
+
+  // -------------------------
+  // AUDIO ROOM SYSTEM EVENTS
+  // -------------------------
+  socket.on("room:join", async ({ roomId }) => {
+    try {
+      socket.join(`room_${roomId}`);
+      const [rooms] = await pool.execute("SELECT * FROM rooms WHERE id = ?", [roomId]);
+      if (!rooms[0]) return;
+
+      const isOwner = rooms[0].creared_by == userId;
+      let role = isOwner ? 'owner' : 'listener';
+
+      await pool.execute(
+        "INSERT INTO room_members (user_id, room_id, role, is_online, joined_at) VALUES (?, ?, ?, 1, NOW()) ON DUPLICATE KEY UPDATE is_online = 1",
+        [userId, roomId, role]
+      );
+
+      broadcastRoomState(roomId);
+    } catch (err) { console.error("[SOCKET AUDIO JOIN ERROR]:", err); }
+  });
+
+  socket.on("room:signal", (data) => {
+    io.to(`user_${data.to}`).emit("room:signal", { from: userId, signal: data.signal });
+  });
+
+  socket.on("room:request_mic", async ({ roomId }) => {
+    try {
+      const [pending] = await pool.execute("SELECT id FROM join_requests WHERE room_id = ? AND user_id = ? AND status = 'pending'", [roomId, userId]);
+      if (pending.length > 0) return;
+
+      await pool.execute("INSERT INTO join_requests (room_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())", [roomId, userId]);
+      const [room] = await pool.execute("SELECT creared_by FROM rooms WHERE id = ?", [roomId]);
+      if (room[0]) io.to(`user_${room[0].creared_by}`).emit("room_audio:queue_update");
+    } catch (err) { console.error("[SOCKET MIC REQUEST ERROR]:", err); }
+  });
+
+  socket.on("room:accept_request", async ({ roomId, targetUserId }) => {
+    try {
+      await pool.execute("UPDATE join_requests SET status = 'accepted' WHERE room_id = ? AND user_id = ?", [roomId, targetUserId]);
+      await pool.execute("UPDATE room_members SET role = 'speaker' WHERE room_id = ? AND user_id = ?", [roomId, targetUserId]);
+      broadcastRoomState(roomId);
+      io.to(`user_${targetUserId}`).emit("room:mic_accepted");
+    } catch (err) { console.error("[SOCKET ACCEPT ERROR]:", err); }
+  });
+
+  socket.on("room:reject_request", async ({ roomId, targetUserId }) => {
+    try {
+      await pool.execute("UPDATE join_requests SET status = 'rejected' WHERE room_id = ? AND user_id = ?", [roomId, targetUserId]);
+      io.to(`user_${targetUserId}`).emit("room:error", "Mic request rejected");
+    } catch (err) { console.error("[SOCKET REJECT ERROR]:", err); }
+  });
+
+  socket.on("room:send_message", async ({ roomId, message }) => {
+    try {
+      const msgData = { id: Date.now(), room_id: roomId, user_id: userId, message, fromUserName: socket.user.name, createdAt: new Date() };
+      io.to(`room_${roomId}`).emit("room:new_message", msgData);
+    } catch (err) { console.error("[ROOM MSG ERROR]:", err); }
+  });
+
+  socket.on("room:leave", async ({ roomId }) => {
+    handleAudioLeave(roomId, userId);
+    socket.leave(`room_${roomId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`[SOCKET] User disconnected: ${userId}`);
+  });
+
+  // Helper functions
+  async function broadcastRoomState(roomId) {
+    const [members] = await pool.execute(
+      "SELECT m.*, u.name, u.avatar FROM room_members m JOIN users u ON m.user_id = u.id WHERE m.room_id = ? AND m.is_online = 1",
+      [roomId]
+    );
+    const [owner] = await pool.execute(`SELECT u.name, u.avatar FROM rooms r JOIN users u ON r.creared_by = u.id WHERE r.id = ?`, [roomId]);
+    io.to(`room_${roomId}`).emit("room:update_state", { members, owner: owner[0] });
+    
+    if (owner[0]) {
+      const [queue] = await pool.execute("SELECT q.*, u.name, u.avatar FROM join_requests q JOIN users u ON q.user_id = u.id WHERE q.room_id = ? AND q.status = 'pending'", [roomId]);
+      io.to(`user_${members.find(m => m.role === 'owner')?.user_id}`).emit("room:queue_update", queue);
+    }
+  }
+
+  async function handleAudioLeave(roomId, uid) {
+    try {
+      await pool.execute("UPDATE room_members SET is_online = 0 WHERE room_id = ? AND user_id = ?", [roomId, uid]);
+      broadcastRoomState(roomId);
+    } catch (e) {}
+  }
+});
+
+// ========================
+// API ROUTES
+// ========================
+
+app.post("/api/auth/register", upload.single("avatar"), async (req, res) => {
+  try {
+    const { name, password } = req.body || {};
+    const avatar = req.file ? req.file.filename : null;
+    if (!name || !password) return res.status(400).json({ message: "Name and password required" });
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const [result] = await pool.execute("INSERT INTO users (name, password, avatar, role, coins) VALUES (?, ?, ?, 'user', 0)", [name, hashedPassword, avatar]);
+    return res.status(201).json({ message: "User registered successfully", user: { id: result.insertId, name, role: "user" } });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ message: "Username already exists" });
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/auth/register-admin", upload.single("avatar"), async (req, res) => {
+  try {
+    const { name, password, adminKey } = req.body || {};
+    const avatar = req.file ? req.file.filename : null;
+    if (adminKey !== ADMIN_REGISTRATION_KEY) return res.status(403).json({ message: "Invalid Admin Key" });
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const [result] = await pool.execute("INSERT INTO users (name, password, avatar, role, gift_send, gift_resnd, coins) VALUES (?, ?, ?, 'admin', 0, 0, 0)", [name, hashedPassword, avatar]);
+    return res.status(201).json({ message: "Admin registered successfully", user: { id: result.insertId, name, role: "admin" } });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { name, password } = req.body || {};
+    const [rows] = await pool.execute("SELECT * FROM users WHERE name = ?", [name]);
+    if (!rows[0] || !(await bcrypt.compare(password, rows[0].password))) return res.status(401).json({ message: "Invalid credentials" });
+    const token = jwt.sign({ id: rows[0].id, name: rows[0].name, role: rows[0].role }, JWT_SECRET, { expiresIn: "7d" });
+    const { password: _, ...userInfo } = rows[0];
+    return res.status(200).json({ message: "Login successful", token, role: rows[0].role, user: userInfo });
+  } catch (err) { return res.status(500).json({ message: "Server error" }); }
+});
+
+app.get("/api/plans", async (req, res) => {
+  try {
+    const [rows] = await pool.execute("SELECT * FROM plans");
+    return res.json(rows);
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.get("/api/rooms", authenticateToken, async (req, res) => {
+  try {
+    const [rooms] = await pool.execute("SELECT * FROM rooms");
+    return res.json(rooms);
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.post("/api/rooms/create", authenticateToken, upload.single("logo"), async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { name } = req.body || {};
+    const logo = req.file ? `/uploads/${req.file.filename}` : null;
+    if (!name) return res.status(400).json({ message: "Name required" });
+
+    await connection.beginTransaction();
+    const [subs] = await connection.execute("SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' AND room_existe = 0", [req.user.id]);
+    if (!subs[0]) { await connection.rollback(); return res.status(403).json({ message: "No active sub or room exists" }); }
+    const [plans] = await connection.execute("SELECT max_users, number_mics FROM plans WHERE id = ?", [subs[0].plan_id]);
+
+    await connection.execute(`
+      INSERT INTO rooms (name, logo, plan_id, number_mic, creared_by, status, isLive, max_users, created_at, expires_at, subscriptions_id)
+      VALUES (?, ?, ?, ?, ?, 'active', 0, ?, CURRENT_DATE, ?, ?)
+    `, [name, logo, subs[0].plan_id, plans[0].number_mics, req.user.id, plans[0].max_users, subs[0].end_date, subs[0].id]);
+
+    await connection.execute("UPDATE subscriptions SET room_existe = 1 WHERE id = ?", [subs[0].id]);
+    await connection.commit();
+    return res.status(201).json({ message: "Room created successfully" });
+  } catch (err) { if (connection) await connection.rollback(); return res.status(500).json({ message: "Error" }); }
+  finally { connection.release(); }
+});
+
+app.post("/api/rooms/start", authenticateToken, async (req, res) => {
+  try {
+    const { roomId } = req.body || {};
+    const [rooms] = await pool.execute("SELECT * FROM rooms WHERE id = ?", [roomId]);
+    if (!rooms[0] || (rooms[0].creared_by != req.user.id && req.user.role !== 'admin')) return res.status(403).json({ message: "Unauthorized" });
+
+    await pool.execute("UPDATE rooms SET isLive = 1, last_live_time = NOW() WHERE id = ?", [roomId]);
+    await pool.execute("INSERT INTO room_members (user_id, room_id, role, is_online, joined_at) VALUES (?, ?, 'owner', 1, NOW()) ON DUPLICATE KEY UPDATE role = 'owner', is_online = 1", [rooms[0].creared_by, roomId]);
+
+    return res.json({ success: true, roomId });
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.get("/api/users/search", authenticateToken, async (req, res) => {
+  try {
+    const { q } = req.query;
+    const [users] = await pool.execute("SELECT id, name, avatar FROM users WHERE name LIKE CONCAT('%', ?, '%') AND id != ? LIMIT 20", [q || "", req.user.id]);
+    return res.json(users);
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.post("/api/friends/request", authenticateToken, async (req, res) => {
+  try {
+    const { toUserId } = req.body;
+    await pool.execute("INSERT INTO friend_requests (fromUserId, toUserId, status) VALUES (?, ?, 'pending')", [req.user.id, toUserId]);
+    io.to(`user_${toUserId}`).emit("new_friend_request", { fromUserId: req.user.id, fromUserName: req.user.name });
+    return res.json({ message: "Sent" });
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.post("/api/friends/accept", authenticateToken, async (req, res) => {
+  try {
+    io.to(`user_${req.user.id}`).emit("chat_created");
+    return res.json({ message: "Accepted" });
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.get("/api/chats", authenticateToken, async (req, res) => {
+  try {
+    const [chats] = await pool.execute(`SELECT c.*, u.id as friendId, u.name as friendName, u.avatar as friendAvatar FROM chats c JOIN users u ON (c.user1_id = u.id OR c.user2_id = u.id) WHERE (c.user1_id = ? OR c.user2_id = ?) AND u.id != ? ORDER BY c.last_message_at DESC`, [req.user.id, req.user.id, req.user.id]);
+    return res.json(chats);
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.get("/api/messages/:userId", authenticateToken, async (req, res) => {
+  try {
+    const [msgs] = await pool.execute(`SELECT * FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY createdAt ASC`, [req.user.id, req.params.userId, req.params.userId, req.user.id]);
+    return res.json(msgs);
+  } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+// 404 Handler - MUST BE LAST
+app.use((req, res) => {
+  return res.status(404).json({ message: `Route ${req.url} not found` });
+});
+
+// START SERVER
+server.listen(PORT, () => {
+  console.log("\n========================================");
+  console.log(`SERVER RUNNING ON http://localhost:${PORT}`);
+  console.log("Database connected & Socket.io Ready");
+  console.log("========================================\n");
+});
+
+---------
+
+ليش الصوت لايرسل اي فقد يطلب صلاحية وال 

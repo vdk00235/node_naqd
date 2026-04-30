@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages | naqd</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); padding: 40px 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        header { margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-list { display: flex; flex-direction: column; gap: 2px; background: #e2e8f0; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+        .chat-card { background: var(--card-bg); padding: 16px 20px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: background 0.2s; text-decoration: none; color: inherit; }
+        .chat-card:hover { background: #f8fafc; }
+        .avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
+        .info { flex: 1; min-width: 0; }
+        .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .name { font-weight: 700; font-size: 1.05rem; }
+        .time { font-size: 0.75rem; color: var(--text-muted); }
+        .last-msg { font-size: 0.9rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); background: white; border-radius: var(--radius); }
+        .btn-new { background: var(--primary); color: white; padding: 10px 20px; border-radius: 20px; text-decoration: none; font-weight: 700; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chats</h1>
+            <a href="search.html" class="btn-new">+ New Chat</a>
+        </header>
+
+        <div id="chatList" class="chat-list">
+            <div class="empty-state">Loading your conversations...</div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = 'login.html';
+
+        async function fetchChats() {
+            try {
+                const res = await fetch('http://localhost:3000/api/chats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const chats = await res.json();
+                renderChats(chats);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderChats(chats) {
+            const list = document.getElementById('chatList');
+            if (chats.length === 0) {
+                list.innerHTML = '<div class="empty-state">No conversations yet.<br><br><a href="search.html" style="color: var(--primary)">Find friends to start chatting!</a></div>';
+                return;
+            }
+
+            list.innerHTML = chats.map(chat => {
+                const date = new Date(chat.last_message_at);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                return `
+                    <a href="chat.html?id=${chat.friendId}" class="chat-card">
+                        <img src="${chat.friendAvatar ? 'http://localhost:3000/uploads/' + chat.friendAvatar : 'https://via.placeholder.com/50'}" class="avatar">
+                        <div class="info">
+                            <div class="top-row">
+                                <div class="name">${chat.friendName}</div>
+                                <div class="time">${timeStr}</div>
+                            </div>
+                            <div class="last-msg">Click to open conversation</div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        fetchChats();
+    </script>
+</body>
+</html>

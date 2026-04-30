@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Plans Management</title>
+    <link rel="stylesheet" href="./styles/admin-plans.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Admin: Plans Management</h1>
+
+        <div id="msg" class="notification"></div>
+
+        <div class="card">
+            <h2 id="formTitle">Create New Plan</h2>
+            <form id="planForm">
+                <input type="hidden" id="planId">
+                <div class="form-grid">
+                    <div class="full-width">
+                        <label>Plan Name</label>
+                        <input type="text" id="name" required>
+                    </div>
+                    <div class="full-width">
+                        <label>Description</label>
+                        <textarea id="description" required></textarea>
+                    </div>
+                    <div>
+                        <label>Price (Coins)</label>
+                        <input type="number" id="price" required>
+                    </div>
+                    <div>
+                        <label>Max Users</label>
+                        <input type="number" id="max_users" required>
+                    </div>
+                    <div>
+                        <label>Number of Mics</label>
+                        <input type="number" id="number_mics" required>
+                    </div>
+                    <div>
+                        <label>Expire (Months)</label>
+                        <input type="number" id="expire_date" required>
+                    </div>
+                    <button type="submit" id="submitBtn" class="btn btn-primary">Create Plan</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-container">
+            <div id="loader" class="loader"></div>
+            <table id="plansTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Users</th>
+                        <th>Mics</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="plansList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3000';
+        const API_URL = BASE_URL + '/api/admin/plans';
+        const token = localStorage.getItem('token');
+        const role = localStorage.getItem('role');
+
+        if (!token || role !== 'admin') {
+            window.location.href = 'login.html';
+        }
+
+        let isEditing = false;
+        let allPlans = [];
+
+        async function safeFetch(url, options) {
+            try {
+                const res = await fetch(url, options);
+                const text = await res.text();
+                console.log(`[DEBUG] Response from ${url}:`, text);
+                
+                try {
+                    const data = JSON.parse(text);
+                    return { ok: res.ok, status: res.status, data };
+                } catch (e) {
+                    console.error("Non-JSON response received:", text);
+                    return { ok: false, status: res.status, message: "Invalid server response" };
+                }
+            } catch (err) {
+                console.error("Fetch error:", err);
+                return { ok: false, message: "Network error or server unreachable" };
+            }
+        }
+
+        async function fetchPlans() {
+            const list = document.getElementById('plansList');
+            const loader = document.getElementById('loader');
+            const msg = document.getElementById('msg');
+
+            loader.style.display = 'block';
+            msg.style.display = 'none';
+
+            const result = await safeFetch(API_URL, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (result.ok) {
+                allPlans = result.data;
+                renderPlans();
+            } else {
+                showStatus("error", result.data?.message || result.message || "Failed to load plans");
+            }
+            loader.style.display = 'none';
+        }
+
+        function renderPlans() {
+            const list = document.getElementById('plansList');
+            list.innerHTML = allPlans.map(plan => `
+                <tr>
+                    <td><strong>${plan.name}</strong></td>
+                    <td>${plan.price} coins</td>
+                    <td>${plan.max_users}</td>
+                    <td>${plan.number_mics}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-edit" onclick="editPlan(${plan.id})">Edit</button>
+                        <button class="btn btn-sm btn-delete" onclick="deletePlan(${plan.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('planForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('planId').value;
+            const payload = {
+                name: document.getElementById('name').value,
+                description: document.getElementById('description').value,
+                price: parseInt(document.getElementById('price').value),
+                max_users: parseInt(document.getElementById('max_users').value),
+                number_mics: parseInt(document.getElementById('number_mics').value),
+                expire_date: parseInt(document.getElementById('expire_date').value)
+            };
+
+            const method = isEditing ? 'PUT' : 'POST';
+            const url = isEditing ? `${API_URL}/${id}` : API_URL;
+
+            const result = await safeFetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (result.ok) {
+                showStatus("success", isEditing ? "Plan updated!" : "Plan created!");
+                resetForm();
+                fetchPlans();
+            } else {
+                showStatus("error", result.data?.message || result.message || "Operation failed");
+            }
+        });
+
+        async function deletePlan(id) {
+            if (!confirm("Are you sure?")) return;
+            const result = await safeFetch(`${API_URL}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (result.ok) {
+                showStatus("success", "Plan deleted");
+                fetchPlans();
+            } else {
+                showStatus("error", result.data?.message || result.message || "Delete failed");
+            }
+        }
+
+        function editPlan(id) {
+            const plan = allPlans.find(p => p.id === id);
+            if (!plan) return;
+            isEditing = true;
+            document.getElementById('planId').value = plan.id;
+            document.getElementById('name').value = plan.name;
+            document.getElementById('description').value = plan.description;
+            document.getElementById('price').value = plan.price;
+            document.getElementById('max_users').value = plan.max_users;
+            document.getElementById('number_mics').value = plan.number_mics;
+            document.getElementById('expire_date').value = plan.expire_date;
+            document.getElementById('formTitle').textContent = "Update Plan";
+            document.getElementById('submitBtn').textContent = "Update Plan";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetForm() {
+            isEditing = false;
+            document.getElementById('planForm').reset();
+            document.getElementById('planId').value = "";
+            document.getElementById('formTitle').textContent = "Create New Plan";
+            document.getElementById('submitBtn').textContent = "Create Plan";
+        }
+
+        function showStatus(type, text) {
+            const msg = document.getElementById('msg');
+            msg.textContent = text;
+            msg.className = `notification ${type}`;
+            msg.style.display = "block";
+            setTimeout(() => msg.style.display = "none", 4000);
+        }
+
+        fetchPlans();
+    </script>
+</body>
+</html>

@@ -52,17 +52,16 @@ app.use("/uploads", express.static(uploadDir));
 // ========================
 
 const pool = mysql.createPool({
-  host: "mysql-production-7869.up.railway.app",
-  user: "root",
-  password: "QaddiKSzwnIgBlsaxvSbMVGaxBzQUJBh",
-  database: "naqd",
+  host: "sql200.infinityfree.com",
+  user: "if0_41805799",
+  password: "mLdrTYw0Yt7T",
+  database: "if0_41805799_naqd",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0
 });
-
 pool.on("error", (err) => {
   console.error(">>> [DATABASE CRITICAL ERROR]:", err);
 });

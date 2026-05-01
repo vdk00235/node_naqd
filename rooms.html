@@ -40,13 +40,13 @@
         </div>
     </div>
     <script>
-        const API_URL = 'http://localhost:3000/api/rooms';
-        const START_URL = 'http://localhost:3000/api/rooms/start';
+        const API_URL = 'https://nodenaqd-production.up.railway.app/api/rooms';
+        const START_URL = 'https://nodenaqd-production.up.railway.app/api/rooms/start';
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user'));
 
         if (!token) window.location.href = 'login.html';
-        const socket = io("http://localhost:3000", {
+        const socket = io("https://nodenaqd-production.up.railway.app", {
             auth: { token }
         });
 
@@ -103,7 +103,7 @@
                     window.location.href = `room.html?id=${room.id}`;
                 };
 
-                const logoUrl = room.logo ? (room.logo.startsWith('http') ? room.logo : `http://localhost:3000${room.logo}`) : 'https://via.placeholder.com/300x180?text=Room+Logo';
+                const logoUrl = room.logo ? (room.logo.startsWith('http') ? room.logo : `https://nodenaqd-production.up.railway.app${room.logo}`) : 'https://via.placeholder.com/300x180?text=Room+Logo';
 
                 let startBtnHtml = '';
                 if ((isOwner || isAdmin) && !isLive) {

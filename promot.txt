@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications | naqd</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="./styles/notification.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Notifications</h1>
+        </header>
+
+        <div id="requestList" class="request-list">
+            <div class="empty-state">Checking for requests...</div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = 'login.html';
+
+        const socket = io("https://nodenaqd-production.up.railway.app", { auth: { token } });
+
+        async function fetchRequests() {
+            try {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/friends/requests', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const requests = await res.json();
+                renderRequests(requests);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderRequests(requests) {
+            const list = document.getElementById('requestList');
+            if (requests.length === 0) {
+                list.innerHTML = '<div class="empty-state">No pending friend requests</div>';
+                return;
+            }
+
+            list.innerHTML = requests.map(req => `
+                <div class="request-card" id="req-${req.id}">
+                    <img src="${req.fromUserAvatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + req.fromUserAvatar : 'https://via.placeholder.com/55'}" class="avatar">
+                    <div class="info">
+                        <div class="name">${req.fromUserName}</div>
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">Sent you a friend request</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-accept" onclick="respond(${req.id}, 'accept')">Accept</button>
+                        <button class="btn btn-reject" onclick="respond(${req.id}, 'reject')">Reject</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function respond(requestId, type) {
+            try {
+                const res = await fetch(`https://nodenaqd-production.up.railway.app/api/friends/${type}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+                if (res.ok) {
+                    document.getElementById(`req-${requestId}`).style.opacity = '0.5';
+                    document.getElementById(`req-${requestId}`).style.pointerEvents = 'none';
+                    setTimeout(() => fetchRequests(), 500);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        socket.on("new_friend_request", (data) => {
+            fetchRequests();
+        });
+
+        fetchRequests();
+    </script>
+</body>
+</html>

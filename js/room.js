@@ -6,7 +6,7 @@ const currentUser = JSON.parse(localStorage.getItem("user"));
 
 if (!token || !roomId) window.location.href = "rooms.html";
 
-const socket = io("http://localhost:3000", { auth: { token } });
+const socket = io("https://nodenaqd-production.up.railway.app", { auth: { token } });
 let currentRole = "listener";
 let isMuted = false;
 let localStream = null;
@@ -16,7 +16,7 @@ const pcConfig = {
 };
 
 async function loadOldMessages() {
-    const res = await fetch(`http://localhost:3000/api/rooms/messages/${roomId}`, {
+    const res = await fetch(`https://nodenaqd-production.up.railway.app/api/rooms/messages/${roomId}`, {
         headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -131,7 +131,7 @@ socket.on("room:update_state", (state) => {
     const { members, owner } = state;
     document.getElementById("roomName").textContent = "Audio Room";
     document.getElementById("ownerAvatar").src = owner.avatar
-        ? `http://localhost:3000/uploads/${owner.avatar}`
+        ? `https://nodenaqd-production.up.railway.app/uploads/${owner.avatar}`
         : "https://via.placeholder.com/45";
 
     const viewers = members.filter((member) => member.is_online).length;
@@ -178,7 +178,7 @@ function renderMics(members) {
 
         if (user) {
             const avatar = user.avatar
-                ? `http://localhost:3000/uploads/${user.avatar}`
+                ? `https://nodenaqd-production.up.railway.app/uploads/${user.avatar}`
                 : "https://via.placeholder.com/85";
 
             slot.innerHTML = `
@@ -223,7 +223,7 @@ socket.on("room:queue_update", (queue) => {
     const list = document.getElementById("queueList");
     list.innerHTML = queue.map((item) => `
         <div class="queue-item">
-            <img style="width:10;height:10;border-raduis:50" src="${item.avatar ? `http://localhost:3000/uploads/${item.avatar}` : "https://via.placeholder.com/30"}" class="queue-avatar">
+            <img style="width:10;height:10;border-raduis:50" src="${item.avatar ? `https://nodenaqd-production.up.railway.app/uploads/${item.avatar}` : "https://via.placeholder.com/30"}" class="queue-avatar">
             <span style="font-size: 0.75rem; font-weight: 700;">${item.name}</span>
             <div class="queue-actions">
                 <button class="q-btn q-accept" onclick="acceptMic(${item.user_id})">✓</button>
@@ -256,7 +256,7 @@ function renderMessage(msg) {
     div.className = "msg";
 
     const avatar = msg.avatar
-        ? `http://localhost:3000/uploads/${msg.avatar}`
+        ? `https://nodenaqd-production.up.railway.app/uploads/${msg.avatar}`
         : "https://via.placeholder.com/30";
 
     div.innerHTML = `

@@ -58,7 +58,7 @@
 
         if (!token || !roomId) window.location.href = 'rooms.html';
 
-        const socket = io("http://localhost:3000", { auth: { token } });
+        const socket = io("https://nodenaqd-production.up.railway.app", { auth: { token } });
         let currentRole = 'listener';
         let isMuted = false;
         let localStream = null;
@@ -71,7 +71,7 @@
         socket.on("room:update_state", (state) => {
             const { members, owner } = state;
             document.getElementById('roomName').textContent = "Audio Room";
-            document.getElementById('ownerAvatar').src = owner.avatar ? `http://localhost:3000/uploads/${owner.avatar}` : 'https://via.placeholder.com/45';
+            document.getElementById('ownerAvatar').src = owner.avatar ? `https://nodenaqd-production.up.railway.app/uploads/${owner.avatar}` : 'https://via.placeholder.com/45';
             
             // Viewers count
             const viewers = members.filter(m => m.is_online).length;
@@ -103,7 +103,7 @@
                 slot.className = 'mic-slot';
                 
                 if (user) {
-                    const avatar = user.avatar ? `http://localhost:3000/uploads/${user.avatar}` : 'https://via.placeholder.com/85';
+                    const avatar = user.avatar ? `https://nodenaqd-production.up.railway.app/uploads/${user.avatar}` : 'https://via.placeholder.com/85';
                     slot.innerHTML = `
                         <div class="mic-circle active">
                             <img src="${avatar}">
@@ -143,7 +143,7 @@
             const list = document.getElementById('queueList');
             list.innerHTML = queue.map(item => `
                 <div class="queue-item">
-                    <img src="${item.avatar ? 'http://localhost:3000/uploads/' + item.avatar : 'https://via.placeholder.com/30'}" class="queue-avatar">
+                    <img src="${item.avatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + item.avatar : 'https://via.placeholder.com/30'}" class="queue-avatar">
                     <span style="font-size: 0.75rem; font-weight: 700;">${item.name}</span>
                     <div class="queue-actions">
                         <button class="q-btn q-accept" onclick="acceptMic(${item.user_id})">✓</button>
@@ -255,8 +255,8 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:3000/api/rooms';
-        const START_URL = 'http://localhost:3000/api/rooms/start';
+        const API_URL = 'https://nodenaqd-production.up.railway.app/api/rooms';
+        const START_URL = 'https://nodenaqd-production.up.railway.app/api/rooms/start';
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user'));
 
@@ -309,7 +309,7 @@
                     window.location.href = `room.html?id=${room.id}`;
                 };
 
-                const logoUrl = room.logo ? (room.logo.startsWith('http') ? room.logo : `http://localhost:3000${room.logo}`) : 'https://via.placeholder.com/300x180?text=Room+Logo';
+                const logoUrl = room.logo ? (room.logo.startsWith('http') ? room.logo : `https://nodenaqd-production.up.railway.app${room.logo}`) : 'https://via.placeholder.com/300x180?text=Room+Logo';
 
                 let startBtnHtml = '';
                 if ((isOwner || isAdmin) && !isLive) {

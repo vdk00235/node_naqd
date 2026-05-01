@@ -49,7 +49,7 @@
 
         async function fetchChats() {
             try {
-                const res = await fetch('http://localhost:3000/api/chats', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/chats', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const chats = await res.json();
@@ -72,7 +72,7 @@
                 
                 return `
                     <a href="chat.html?id=${chat.friendId}" class="chat-card">
-                        <img src="${chat.friendAvatar ? 'http://localhost:3000/uploads/' + chat.friendAvatar : 'https://via.placeholder.com/50'}" class="avatar">
+                        <img src="${chat.friendAvatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + chat.friendAvatar : 'https://via.placeholder.com/50'}" class="avatar">
                         <div class="info">
                             <div class="top-row">
                                 <div class="name">${chat.friendName}</div>

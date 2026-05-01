@@ -22,11 +22,11 @@
         const token = localStorage.getItem('token');
         if (!token) window.location.href = 'login.html';
 
-        const socket = io("http://localhost:3000", { auth: { token } });
+        const socket = io("https://nodenaqd-production.up.railway.app", { auth: { token } });
 
         async function fetchRequests() {
             try {
-                const res = await fetch('http://localhost:3000/api/friends/requests', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/friends/requests', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const requests = await res.json();
@@ -45,7 +45,7 @@
 
             list.innerHTML = requests.map(req => `
                 <div class="request-card" id="req-${req.id}">
-                    <img src="${req.fromUserAvatar ? 'http://localhost:3000/uploads/' + req.fromUserAvatar : 'https://via.placeholder.com/55'}" class="avatar">
+                    <img src="${req.fromUserAvatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + req.fromUserAvatar : 'https://via.placeholder.com/55'}" class="avatar">
                     <div class="info">
                         <div class="name">${req.fromUserName}</div>
                         <div style="color: var(--text-muted); font-size: 0.85rem;">Sent you a friend request</div>
@@ -60,7 +60,7 @@
 
         async function respond(requestId, type) {
             try {
-                const res = await fetch(`http://localhost:3000/api/friends/${type}`, {
+                const res = await fetch(`https://nodenaqd-production.up.railway.app/api/friends/${type}`, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',

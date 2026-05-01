@@ -50,7 +50,7 @@
             const alert = document.getElementById('alert');
             
             try {
-                const res = await fetch(`http://localhost:3000/api/users/search?q=${encodeURIComponent(q)}`, {
+                const res = await fetch(`https://nodenaqd-production.up.railway.app/api/users/search?q=${encodeURIComponent(q)}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const users = await res.json();
@@ -65,7 +65,7 @@
 
                 list.innerHTML = users.map(user => `
                     <div class="user-card">
-                        <img src="${user.avatar ? 'http://localhost:3000/uploads/' + user.avatar : 'https://via.placeholder.com/50'}" class="avatar">
+                        <img src="${user.avatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + user.avatar : 'https://via.placeholder.com/50'}" class="avatar">
                         <div class="user-info">
                             <div class="user-name">${user.name}</div>
                         </div>
@@ -86,7 +86,7 @@
             btn.textContent = 'Sending...';
             
             try {
-                const res = await fetch('http://localhost:3000/api/friends/request', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/friends/request', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',

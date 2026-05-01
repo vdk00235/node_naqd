@@ -62,7 +62,7 @@
         // 1. Initial Access Check
         async function checkAccess() {
             try {
-                const res = await fetch('http://localhost:3000/api/subscriptions/me', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/subscriptions/me', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -98,7 +98,7 @@
             formData.append('logo', logo);
 
             try {
-                const res = await fetch('http://localhost:3000/api/rooms/create', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/rooms/create', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData

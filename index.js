@@ -14,8 +14,8 @@ const server = http.createServer(app);
 const io = require("socket.io")(server, {
   cors: { origin: "*" }
 });
-const PORT = process.env.PORT || 3000;
-const UPLOADS_BASE_URL = `http://192.168.137.2:${PORT}`;
+const PORT = process.env.PORT || 8080;
+const UPLOADS_BASE_URL = `https://nodenaqd-production.up.railway.app`;
 
 // Security Configuration
 const JWT_SECRET = "NAQD_SUPER_SECURE_JWT_2024_KEY_PROD";

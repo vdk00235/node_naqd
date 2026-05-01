@@ -211,7 +211,7 @@
 
             // safeFetch doesn't support FormData directly in its internal text() logging easily if it's large, but let's adapt it.
             try {
-                const res = await fetch('http://localhost:3000/api/auth/register-admin', {
+                const res = await fetch('https://nodenaqd-production.up.railway.app/api/auth/register-admin', {
                     method: 'POST',
                     body: formData
                 });

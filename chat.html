@@ -60,13 +60,13 @@
 
         if (!token || !friendId) window.location.href = 'chats.html';
 
-        const socket = io("http://localhost:3000", { auth: { token } });
+        const socket = io("https://nodenaqd-production.up.railway.app", { auth: { token } });
 
         async function initChat() {
             try {
                 // Fetch basic friend info from chat list or specialized API
                 // For simplicity, we assume we fetch it here
-                const resChats = await fetch('http://localhost:3000/api/chats', {
+                const resChats = await fetch('https://nodenaqd-production.up.railway.app/api/chats', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const chats = await resChats.json();
@@ -74,11 +74,11 @@
                 
                 if (chat) {
                     document.getElementById('friendName').textContent = chat.friendName;
-                    document.getElementById('friendAvatar').src = chat.friendAvatar ? 'http://localhost:3000/uploads/' + chat.friendAvatar : 'https://via.placeholder.com/40';
+                    document.getElementById('friendAvatar').src = chat.friendAvatar ? 'https://nodenaqd-production.up.railway.app/uploads/' + chat.friendAvatar : 'https://via.placeholder.com/40';
                 }
 
                 // Fetch history
-                const resMsgs = await fetch(`http://localhost:3000/api/messages/${friendId}`, {
+                const resMsgs = await fetch(`https://nodenaqd-production.up.railway.app/api/messages/${friendId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const msgs = await resMsgs.json();

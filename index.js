@@ -52,9 +52,9 @@ app.use("/uploads", express.static(uploadDir));
 // ========================
 
 const pool = mysql.createPool({
-  host: "localhost",
+  host: "mysql-production-7869.up.railway.app",
   user: "root",
-  password: "",
+  password: "QaddiKSzwnIgBlsaxvSbMVGaxBzQUJBh",
   database: "naqd",
   waitForConnections: true,
   connectionLimit: 10,

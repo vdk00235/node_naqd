@@ -52,10 +52,10 @@ app.use("/uploads", express.static(uploadDir));
 // ========================
 
 const pool = mysql.createPool({
-  host: "sql200.infinityfree.com",
-  user: "if0_41805799",
-  password: "mLdrTYw0Yt7T",
-  database: "if0_41805799_naqd",
+  host: "mysql-naqd.alwaysdata.net",
+  user: "naqd",
+  password: "naqd_pass",
+  database: "naqd_node_db",
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

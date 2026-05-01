@@ -1490,7 +1490,9 @@ app.get("/api/gifts", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Error loading gifts" });
   }
 });
-
+app.get("/", (req, res) => {
+  res.send("API WORKING");
+});
 app.get("/api/messages/:userId", authenticateToken, async (req, res) => {
   try {
     const [msgs] = await pool.execute(`SELECT * FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY createdAt ASC`, [req.user.id, req.params.userId, req.params.userId, req.user.id]);

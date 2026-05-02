@@ -107,6 +107,30 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+function buildIceServers() {
+  const servers = [{ urls: "stun:stun.l.google.com:19302" }];
+  const rawTurnUrls = process.env.TURN_URLS || process.env.TURN_URL || "";
+  const turnUsername = process.env.TURN_USERNAME || "";
+  const turnCredential = process.env.TURN_CREDENTIAL || process.env.TURN_PASSWORD || "";
+
+  if (rawTurnUrls.trim() && turnUsername && turnCredential) {
+    const urls = rawTurnUrls
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (urls.length > 0) {
+      servers.push({
+        urls,
+        username: turnUsername,
+        credential: turnCredential
+      });
+    }
+  }
+
+  return servers;
+}
+
 const giftsUpload = upload.fields([
   { name: "image", maxCount: 1 },
   { name: "video", maxCount: 1 }
@@ -219,6 +243,7 @@ async function createUserNotification({
 io.on("connection", (socket) => {
   const userId = socket.user?.id;
   if (!userId) return;
+  socket.data.activeRoomId = null;
 
   console.log(`[SOCKET] User connected: ${userId} (${socket.user.name})`);
   socket.join(`user_${userId}`);
@@ -355,6 +380,7 @@ io.on("connection", (socket) => {
   socket.on("room:join", async ({ roomId }) => {
     try {
       socket.join(`room_${roomId}`);
+      socket.data.activeRoomId = roomId;
       const [rooms] = await pool.execute("SELECT * FROM rooms WHERE id = ?", [roomId]);
 
       if (!rooms[0]) return;
@@ -489,6 +515,12 @@ io.on("connection", (socket) => {
         return;
       }
 
+      if (Number(room.creared_by) === Number(userId)) {
+        await connection.rollback();
+        socket.emit("room:gift_error", "SELF_GIFT_NOT_ALLOWED");
+        return;
+      }
+
       const [[gift]] = await connection.execute(
         "SELECT * FROM gifts WHERE id = ? LIMIT 1",
         [giftId]
@@ -564,13 +596,35 @@ io.on("connection", (socket) => {
       }
 
       socket.leave(`room_${roomId}`);
+      if (socket.data.activeRoomId?.toString() == roomId?.toString()) {
+        socket.data.activeRoomId = null;
+      }
 
     } catch (err) {
       console.error(err);
     }
   });
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log(`[SOCKET] User disconnected: ${userId}`);
+    const roomId = socket.data.activeRoomId;
+    if (!roomId) return;
+
+    try {
+      const [room] = await pool.execute(
+        "SELECT creared_by FROM rooms WHERE id = ? LIMIT 1",
+        [roomId]
+      );
+
+      if (room[0] && room[0].creared_by == userId) {
+        await closeRoom(roomId);
+      } else {
+        await handleAudioLeave(roomId, userId);
+      }
+    } catch (err) {
+      console.error("[SOCKET DISCONNECT CLEANUP ERROR]:", err);
+    } finally {
+      socket.data.activeRoomId = null;
+    }
   });
 
   // Helper functions
@@ -640,7 +694,7 @@ app.post("/api/auth/register", upload.single("avatar"), async (req, res) => {
     if (rows.length > 0) {
       return res.status(400).json({ message: "Username already exists" });
     }
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.execute("INSERT INTO users (name, password, avatar, role, coins) VALUES (?, ?, ?, 'user', 0)", [name, hashedPassword, avatar]);
     return res.status(201).json({ message: "User registered successfully", user: { id: result.insertId, name, role: "user" } });
   } catch (err) {
@@ -658,7 +712,7 @@ app.post("/api/auth/register-admin", upload.single("avatar"), async (req, res) =
       return res.status(400).json({ message: "Username already exists" });
     }
     if (adminKey !== ADMIN_REGISTRATION_KEY) return res.status(403).json({ message: "Invalid Admin Key" });
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.execute("INSERT INTO users (name, password, avatar, role, gift_send, gift_resnd, coins) VALUES (?, ?, ?, 'admin', 0, 0, 0)", [name, hashedPassword, avatar]);
     return res.status(201).json({ message: "Admin registered successfully", user: { id: result.insertId, name, role: "admin" } });
   } catch (err) {
@@ -682,6 +736,14 @@ app.get("/api/plans", async (req, res) => {
     const [rows] = await pool.execute("SELECT * FROM plans");
     return res.json(rows);
   } catch (err) { return res.status(500).json({ message: "Error" }); }
+});
+
+app.get("/api/webrtc/ice-servers", authenticateToken, async (req, res) => {
+  try {
+    return res.json({ iceServers: buildIceServers() });
+  } catch (err) {
+    return res.status(500).json({ message: "Error loading ICE servers" });
+  }
 });
 
 app.get("/api/rooms", authenticateToken, async (req, res) => {

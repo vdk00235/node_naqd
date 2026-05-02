@@ -136,6 +136,14 @@ const giftsUpload = upload.fields([
   { name: "video", maxCount: 1 }
 ]);
 
+function toAbsoluteUploadUrl(filePath) {
+  if (!filePath) return null;
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+    return filePath;
+  }
+  return `${UPLOADS_BASE_URL}${filePath}`;
+}
+
 function deleteUploadFile(filePath) {
   if (!filePath) return;
 
@@ -397,6 +405,10 @@ io.on("connection", (socket) => {
       );
 
       broadcastRoomState(roomId);
+      socket.to(`room_${roomId}`).emit("room:member_joined", {
+        roomId,
+        userId: userId.toString()
+      });
       if (isOwner) {
         sendRoomQueueUpdate(roomId);
       }
@@ -560,8 +572,8 @@ io.on("connection", (socket) => {
         giftId: gift.id,
         giftName: gift.name,
         giftPoints: gift.points,
-        imageUrl: gift.image ? `${UPLOADS_BASE_URL}${gift.image}` : null,
-        videoUrl: gift.video ? `${UPLOADS_BASE_URL}${gift.video}` : null,
+        imageUrl: toAbsoluteUploadUrl(gift.image),
+        videoUrl: toAbsoluteUploadUrl(gift.video),
         senderId: sender.id,
         senderName: sender.name,
         receiverId: room.creared_by,
@@ -1554,8 +1566,8 @@ app.get("/api/gifts", authenticateToken, async (req, res) => {
 
     const payload = rows.map((gift) => ({
       ...gift,
-      image: gift.image ? `${UPLOADS_BASE_URL}${gift.image}` : null,
-      video: gift.video ? `${UPLOADS_BASE_URL}${gift.video}` : null
+      image: toAbsoluteUploadUrl(gift.image),
+      video: toAbsoluteUploadUrl(gift.video)
     }));
 
     res.json(payload);

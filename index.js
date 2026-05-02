@@ -921,6 +921,18 @@ app.get("/api/dashboard/me", authenticateToken, async (req, res) => {
   }
 });
 
+app.get("/warmup", async (req, res) => {
+    try {
+        await pool.execute("SELECT 1");
+
+        // اختبار خفيف إضافي (اختياري)
+        await pool.execute("SELECT NOW()");
+
+        res.json({ status: "ok", db: "ready" });
+    } catch (e) {
+        res.status(500).json({ status: "error" });
+    }
+});
 app.get("/api/friends/requests", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;

@@ -441,6 +441,7 @@ io.on("connection", (socket) => {
       if (pending.length > 0) return;
 
       await pool.execute("INSERT INTO join_requests (room_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())", [roomId, userId]);
+      socket.emit("room:request_mic_submitted", { roomId });
       sendRoomQueueUpdate(roomId);
     } catch (err) { console.error("[SOCKET MIC REQUEST ERROR]:", err); }
   });
@@ -458,7 +459,6 @@ io.on("connection", (socket) => {
       await pool.execute("UPDATE room_members SET role = 'speaker', is_muted = 0 WHERE room_id = ? AND user_id = ?", [roomId, targetUserId]);
       broadcastRoomState(roomId);
       io.to(`user_${targetUserId}`).emit("room:mic_accepted");
-      broadcastRoomState(roomId);
       sendRoomQueueUpdate(roomId);
     } catch (err) { console.error("[SOCKET ACCEPT ERROR]:", err); }
   });

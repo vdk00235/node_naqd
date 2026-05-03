@@ -199,6 +199,29 @@ async function sendRoomQueueUpdate(roomId) {
   io.to(`user_${roomRows[0].creared_by}`).emit("room:queue_update", queue);
 }
 
+async function emitImmediateJoinRequest(roomId, requesterId) {
+  const [roomRows] = await pool.execute(
+    "SELECT creared_by FROM rooms WHERE id = ? LIMIT 1",
+    [roomId]
+  );
+
+  if (!roomRows[0]) return;
+
+  const [[requester]] = await pool.execute(
+    "SELECT id, name, avatar FROM users WHERE id = ? LIMIT 1",
+    [requesterId]
+  );
+
+  if (!requester) return;
+
+  io.to(`user_${roomRows[0].creared_by}`).emit("room:new_join_request", {
+    roomId,
+    user_id: requester.id,
+    name: requester.name,
+    avatar: requester.avatar
+  });
+}
+
 async function emitRoomClosed(roomId) {
   io.to(`room_${roomId}`).emit("room:close");
   io.emit("room:live_status", {
@@ -442,6 +465,7 @@ io.on("connection", (socket) => {
 
       await pool.execute("INSERT INTO join_requests (room_id, user_id, status, created_at) VALUES (?, ?, 'pending', NOW())", [roomId, userId]);
       socket.emit("room:request_mic_submitted", { roomId });
+      await emitImmediateJoinRequest(roomId, userId);
       sendRoomQueueUpdate(roomId);
     } catch (err) { console.error("[SOCKET MIC REQUEST ERROR]:", err); }
   });
